@@ -1,6 +1,6 @@
 # Interview Prep Activity Tracker
 
-A local-first React and Express app for tracking interview-prep work in CSV files. Each curriculum plan has its own CSV, and markdown uploads can create new plan-specific trackers.
+A local-first React and Express app for managing interview prep through workspace boards, notebooks, Codex chat, and guided sessions. Managed workspaces use JSON plus Markdown-backed notes on disk, while older CSV plan workflows are still supported and can be migrated into normal workspaces.
 
 ## Quick Start
 
@@ -63,20 +63,22 @@ launcher\bin\Release\net48\InterviewPrepTrackerLauncher.exe
 
 ## What It Does
 
-- Keeps tracker data in CSV files, not a database.
-- Starts with an empty plan registry; plans are created explicitly when needed.
-- Lets the main page switch between available plans.
+- Keeps data on the local filesystem, not in a database.
+- Supports managed workspaces with board cards stored in `tasks.json`, subjects stored in `subjects.json`, and workspace notes/notebooks stored under each workspace directory.
+- Keeps notebook content exclusive to each workspace and autosaves the active notebook when switching between notebooks.
+- Lets you create and delete managed workspaces from the app.
+- Requires a double confirmation before deleting a managed workspace.
+- Exposes a special job-search workspace backed by `./data/job-applications.json`.
+- Keeps a Plans tab for CSV-backed legacy plans and markdown-to-plan generation.
 - Creates and revises plans through Open Chat CSV previews.
-- Creates a separate CSV for every uploaded plan under `./data/plans/<plan-id>/study_activities.csv`.
-- Deletes uploaded plans and their CSV files from the Plans tab.
-- Adds a unified Chat tab for open Codex chat and guided learning sessions.
-- Lets open chat prompt Codex with tracker progress and selected markdown sources.
-- Adds a Profile tab for saved resume/background context that Codex can use for STAR and behavioral guidance.
-- Adds a global Job Apps tab backed by `./data/job-applications.json`.
 - Saves valid Codex CSV previews as new plans, additions to the selected plan, or replacements for the selected plan.
-- Drafts guided Codex lessons from individual tracker tasks.
-- Lets Codex review completed sessions, update the source tracker row, and maintain `./data/knowledge-base.md`.
-- Optionally invokes Codex on the backend to revise the current curriculum into the new plan CSV.
+- Lets legacy plan workspaces be migrated into normal managed workspaces from the workspace header.
+- Preserves legacy workspace notebooks during plan-to-workspace migration and rewrites old Palantir-style chat/session references to the new workspace.
+- Adds a unified Chat area for open Codex chat and guided learning sessions.
+- Lets open chat prompt Codex with tracker progress, workspace context, selected markdown sources, and saved profile context.
+- Drafts guided Codex lessons from individual tracker tasks or board cards.
+- Lets Codex review completed sessions, update the source task/card, and maintain `./data/knowledge-base.md`.
+- Optionally invokes Codex on the backend to revise a curriculum into a new plan CSV.
 - Falls back to a starter CSV parsed from markdown when Codex is not configured.
 
 ## Codex Revision Command
@@ -112,15 +114,49 @@ If the command fails, the backend stores the prompt at:
 
 and creates a starter CSV so the plan can still be selected and edited.
 
+## Storage Layout
+
+Managed workspace data lives under:
+
+```text
+./data/workspaces.json
+./data/workspaces/<workspace-id>/subjects.json
+./data/workspaces/<workspace-id>/tasks.json
+./data/workspaces/<workspace-id>/notes.md
+./data/workspaces/<workspace-id>/notebooks/index.json
+./data/workspaces/<workspace-id>/notebooks/<notebook-id>.json
+```
+
+Legacy plan data still lives under:
+
+```text
+./data/plans.json
+./data/study_activities.csv
+./data/plans/<plan-id>/study_activities.csv
+```
+
+Other persisted app data:
+
+```text
+./data/job-applications.json
+./data/chat-sessions/
+./data/learning-sessions/
+./data/knowledge-base.md
+./data/profile.json
+./data/sources.json
+```
+
 ## Configuration
 
 Default data paths:
 
 ```text
+./data/workspaces.json
+./data/workspaces/<workspace-id>/
 ./data/plans.json
-./data/job-applications.json
 ./data/study_activities.csv
 ./data/plans/<plan-id>/study_activities.csv
+./data/job-applications.json
 ```
 
 Environment variables:
