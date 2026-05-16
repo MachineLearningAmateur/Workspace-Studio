@@ -11,6 +11,7 @@ internal static class InterviewPrepTrackerLauncher
     private const string NpmPath = @"C:\Program Files\nodejs\npm.cmd";
     private const string ApiHealthUrl = "http://127.0.0.1:3001/api/health";
     private const string PageUrl = "http://127.0.0.1:5173/";
+    private static readonly string LogPath = Path.Combine(AppDirectory, "launcher", "tracker-launcher.log");
 
     [STAThread]
     private static void Main()
@@ -24,12 +25,12 @@ internal static class InterviewPrepTrackerLauncher
 
             if (!IsUrlReady(ApiHealthUrl) || !IsUrlReady(PageUrl))
             {
-                StartDevConsole();
+                StartDevServer();
             }
 
             if (!WaitForUrl(PageUrl, TimeSpan.FromSeconds(45)))
             {
-                throw new TimeoutException("The tracker page did not become ready at " + PageUrl);
+                throw new TimeoutException("The tracker page did not become ready at " + PageUrl + Environment.NewLine + "Check the launcher log at " + LogPath);
             }
 
             Process.Start(new ProcessStartInfo(PageUrl) { UseShellExecute = true });
@@ -45,18 +46,22 @@ internal static class InterviewPrepTrackerLauncher
         }
     }
 
-    private static void StartDevConsole()
+    private static void StartDevServer()
     {
+        Directory.CreateDirectory(Path.GetDirectoryName(LogPath));
+
         string command = string.Format(
-            "/k \"title Interview Prep Tracker Server && \"{0}\" run dev\"",
-            NpmPath
+            "/c \"\"{0}\" run dev > \"{1}\" 2>&1\"",
+            NpmPath,
+            LogPath
         );
 
         Process.Start(new ProcessStartInfo("cmd.exe", command)
         {
             WorkingDirectory = AppDirectory,
-            WindowStyle = ProcessWindowStyle.Normal,
-            UseShellExecute = true
+            CreateNoWindow = true,
+            UseShellExecute = false,
+            WindowStyle = ProcessWindowStyle.Hidden
         });
     }
 

@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { parse } from "csv-parse/sync";
 import { stringify } from "csv-stringify/sync";
+import { syncActivityRowIds } from "./rowIdentityStore.js";
 
 export const activityColumns = [
   "date",
@@ -31,6 +32,7 @@ export const categories = [
   "binary_search",
   "linked_list",
   "trees",
+  "trie",
   "heap",
   "intervals",
   "backtracking",
@@ -38,7 +40,6 @@ export const categories = [
   "dp_1d",
   "system_design",
   "behavioral",
-  "mock_interview",
   "review"
 ] as const;
 
@@ -47,7 +48,6 @@ export const itemTypes = [
   "leetcode_review",
   "system_design",
   "behavioral",
-  "mock",
   "notes_review"
 ] as const;
 
@@ -74,6 +74,7 @@ export type Result = (typeof results)[number] | "";
 export type InterviewRelevance = (typeof interviewRelevanceValues)[number];
 
 export interface ActivityRow {
+  row_id: string;
   date: string;
   category: Category;
   item_type: ItemType;
@@ -145,7 +146,11 @@ export async function loadActivityRows(csvPath = getTrackerCsvPath()): Promise<A
   }
 
   validateHeaderAndRows(records);
-  return records.map((record, index) => ({ ...normalizeRow(record), row_index: index }));
+  const rowsWithIds = await syncActivityRowIds(
+    csvPath,
+    records.map((record) => normalizeRow(record))
+  );
+  return rowsWithIds.map((record, index) => ({ ...record, row_index: index }));
 }
 
 export async function appendActivityRow(input: ActivityInput, csvPath = getTrackerCsvPath()) {
@@ -177,7 +182,29 @@ export async function updateActivityRow(rowIndex: number, input: ActivityInput, 
   const updated = validateAndNormalizeInput({ ...current, ...pickActivityFields(input) });
   const nextRows = rows.map((row, index) => (index === rowIndex ? updated : stripRowIndex(row)));
   await saveActivityRows(nextRows, csvPath);
-  return { ...updated, row_index: rowIndex };
+  const refreshedRows = await loadActivityRows(csvPath);
+  return refreshedRows[rowIndex];
+}
+
+export async function deleteActivityRow(rowIndex: number, csvPath = getTrackerCsvPath()) {
+  if (!Number.isInteger(rowIndex) || rowIndex < 0) {
+    throw new CsvStoreError("Invalid row index", 400);
+  }
+
+  const rows = await loadActivityRows(csvPath);
+  const row = rows[rowIndex];
+
+  if (!row) {
+    throw new CsvStoreError(`Tracker row not found for index ${rowIndex}`, 404);
+  }
+
+  if (!isCustomRow(row)) {
+    throw new CsvStoreError(`Only custom rows can be deleted: "${row.item_name}"`, 400);
+  }
+
+  const nextRows = rows.filter((_, index) => index !== rowIndex).map(stripRowIndex);
+  await saveActivityRows(nextRows, csvPath);
+  return row;
 }
 
 export async function resetActivityRows(csvPath = getTrackerCsvPath()) {
@@ -186,9 +213,38 @@ export async function resetActivityRows(csvPath = getTrackerCsvPath()) {
   return loadActivityRows(csvPath);
 }
 
-async function saveActivityRows(rows: ActivityRow[], csvPath: string) {
-  validateHeaderAndRows(rows);
-  const csv = stringify(rows, {
+export async function replaceActivityRowsFromCsv(csv: string, csvPath = getTrackerCsvPath()) {
+  const rows = parseActivityCsv(csv);
+  await saveActivityRows(rows, csvPath);
+  return loadActivityRows(csvPath);
+}
+
+export function parseActivityCsv(csv: string): ActivityRow[] {
+  let records: Record<string, string>[];
+
+  try {
+    records = parse(csv, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: false
+    });
+  } catch (error) {
+    try {
+      records = parseRepairableActivityCsv(csv);
+    } catch {
+      throw new CsvStoreError(`Unable to parse tracker CSV: ${getErrorMessage(error)}`, 400);
+    }
+  }
+
+  validateHeaderAndRows(records);
+  return records.map((record) => normalizeRow(record));
+}
+
+export async function saveActivityRows(rows: ActivityRow[], csvPath: string) {
+  const normalizedRows = rows.map((row) => normalizeRow(row));
+  validateHeaderAndRows(normalizedRows);
+  const rowsWithIds = await syncActivityRowIds(csvPath, normalizedRows);
+  const csv = stringify(rowsWithIds.map(stripRowMetadata), {
     header: true,
     columns: activityColumns
   });
@@ -202,9 +258,9 @@ async function saveActivityRows(rows: ActivityRow[], csvPath: string) {
 
 async function safeWriteFile(filePath: string, content: string) {
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  const tempPath = `${filePath}.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 10)}.tmp`;
   await fs.writeFile(tempPath, content, "utf8");
-  await fs.rename(tempPath, filePath);
+  await replaceFileWithRetry(tempPath, filePath);
 }
 
 function validateHeaderAndRows(records: Array<Record<string, string> | ActivityRow>) {
@@ -225,6 +281,70 @@ function validateAndNormalizeInput(input: ActivityInput): ActivityRow {
   return row;
 }
 
+function parseRepairableActivityCsv(csv: string): Record<string, string>[] {
+  const rows = parse(csv, {
+    columns: false,
+    skip_empty_lines: true,
+    trim: false,
+    relax_column_count: true
+  }) as string[][];
+
+  const [header, ...dataRows] = rows;
+
+  if (!header || header.length < activityColumns.length) {
+    throw new CsvStoreError("Malformed CSV: missing tracker header", 400);
+  }
+
+  const normalizedHeader = header.slice(0, activityColumns.length).map((column) => column.trim());
+
+  if (normalizedHeader.join(",") !== activityColumns.join(",")) {
+    throw new CsvStoreError("Malformed CSV: header does not match tracker schema", 400);
+  }
+
+  return dataRows.map((row, index) => {
+    const repairedRow =
+      row.length < activityColumns.length
+        ? repairShortActivityRow(row, index + 2)
+        : row.length > activityColumns.length
+          ? [...row.slice(0, activityColumns.length - 1), row.slice(activityColumns.length - 1).join(",")]
+          : row;
+
+    return Object.fromEntries(activityColumns.map((column, columnIndex) => [column, repairedRow[columnIndex] ?? ""]));
+  });
+}
+
+function repairShortActivityRow(row: string[], lineNumber: number) {
+  if (row.length < 6) {
+    throw new CsvStoreError(`Malformed CSV: row ${lineNumber} has too few columns`, 400);
+  }
+
+  const prefix = row.slice(0, 6);
+  const remainder = row.slice(6);
+  const relevanceIndex = remainder.findIndex((value) => relevanceSet.has(value.trim()));
+
+  if (relevanceIndex >= 0 && relevanceIndex <= 5) {
+    const beforeRelevance = remainder.slice(0, relevanceIndex);
+    const afterRelevance = remainder.slice(relevanceIndex + 1);
+
+    if (afterRelevance.length <= 4) {
+      return [
+        ...prefix,
+        ...beforeRelevance,
+        ...Array.from({ length: 5 - beforeRelevance.length }, () => ""),
+        remainder[relevanceIndex],
+        ...afterRelevance,
+        ...Array.from({ length: 4 - afterRelevance.length }, () => "")
+      ];
+    }
+  }
+
+  if (row.length < activityColumns.length) {
+    return [...row, ...Array.from({ length: activityColumns.length - row.length }, () => "")];
+  }
+
+  return row;
+}
+
 function validateRow(row: ActivityRow) {
   requireDate(row.date, "date");
   requireEnum(row.category, categorySet, "category");
@@ -237,29 +357,34 @@ function validateRow(row: ActivityRow) {
   optionalEnum(row.attempt_type, attemptTypeSet, "attempt_type");
   optionalEnum(row.result, resultSet, "result");
   requireEnum(row.interview_relevance, relevanceSet, "interview_relevance");
-  optionalDate(row.scheduled_date, "scheduled_date");
+  optionalDateOrTimestamp(row.scheduled_date, "scheduled_date");
   optionalTimestamp(row.completed_at, "completed_at");
 }
 
 function normalizeRow(record: Partial<Record<ActivityColumn, string>>): ActivityRow {
   return {
-    date: record.date ?? "",
-    category: (record.category ?? "") as Category,
-    item_type: (record.item_type ?? "") as ItemType,
-    item_name: record.item_name ?? "",
-    difficulty: (record.difficulty ?? "") as Difficulty,
-    status: (record.status ?? "") as Status,
-    time_spent_min: record.time_spent_min ?? "",
-    confidence: record.confidence ?? "",
-    attempt_type: (record.attempt_type ?? "") as AttemptType,
-    result: (record.result ?? "") as Result,
-    pattern: record.pattern ?? "",
-    interview_relevance: (record.interview_relevance ?? "") as InterviewRelevance,
-    scheduled_date: record.scheduled_date ?? "",
-    completed_at: record.completed_at ?? "",
-    source: record.source ?? "",
-    notes: record.notes ?? ""
+    row_id: normalizeField((record as { row_id?: string }).row_id),
+    date: normalizeField(record.date),
+    category: normalizeField(record.category) as Category,
+    item_type: normalizeField(record.item_type) as ItemType,
+    item_name: normalizeField(record.item_name),
+    difficulty: normalizeField(record.difficulty) as Difficulty,
+    status: normalizeField(record.status) as Status,
+    time_spent_min: normalizeField(record.time_spent_min),
+    confidence: normalizeField(record.confidence),
+    attempt_type: normalizeField(record.attempt_type) as AttemptType,
+    result: normalizeField(record.result) as Result,
+    pattern: normalizeField(record.pattern),
+    interview_relevance: normalizeField(record.interview_relevance) as InterviewRelevance,
+    scheduled_date: normalizeField(record.scheduled_date),
+    completed_at: normalizeField(record.completed_at),
+    source: normalizeField(record.source),
+    notes: normalizeField(record.notes)
   };
+}
+
+function normalizeField(value: string | undefined) {
+  return String(value ?? "").trim();
 }
 
 function pickActivityFields(input: ActivityInput) {
@@ -269,6 +394,15 @@ function pickActivityFields(input: ActivityInput) {
 function stripRowIndex(row: ActivityRowWithIndex): ActivityRow {
   const { row_index: _rowIndex, ...activityRow } = row;
   return activityRow;
+}
+
+function stripRowMetadata(row: ActivityRow) {
+  const { row_id: _rowId, ...activityRow } = row;
+  return activityRow;
+}
+
+function isCustomRow(row: ActivityRowWithIndex) {
+  return row.source === "custom";
 }
 
 function requireDate(value: string, field: string) {
@@ -281,6 +415,12 @@ function requireDate(value: string, field: string) {
 function optionalDate(value: string, field: string) {
   if (value && !datePattern.test(value)) {
     throw new CsvStoreError(`${field} must use YYYY-MM-DD`, 400);
+  }
+}
+
+function optionalDateOrTimestamp(value: string, field: string) {
+  if (value && !datePattern.test(value) && !isoTimestampPattern.test(value)) {
+    throw new CsvStoreError(`${field} must use YYYY-MM-DD or YYYY-MM-DDTHH:mm`, 400);
   }
 }
 
@@ -336,4 +476,47 @@ function optionalIntegerRange(value: string, field: string, min: number, max: nu
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isFileNotFound(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+}
+
+async function replaceFileWithRetry(tempPath: string, targetPath: string) {
+  const maxAttempts = 6;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await fs.rename(tempPath, targetPath);
+      return;
+    } catch (error) {
+      if (isFileNotFound(error)) {
+        try {
+          await fs.access(targetPath);
+          return;
+        } catch {
+          throw error;
+        }
+      }
+
+      if (!isRetryableReplaceError(error) || attempt === maxAttempts) {
+        throw error;
+      }
+
+      await delay(attempt * 40);
+    }
+  }
+}
+
+function isRetryableReplaceError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error.code === "EPERM" || error.code === "EACCES" || error.code === "EBUSY")
+  );
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

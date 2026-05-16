@@ -7,6 +7,12 @@
     <title>Interview Prep Activity Tracker</title>
   </head>
   <body>
+    <script>
+      (() => {
+        const savedTheme = window.localStorage.getItem("careerprep-theme");
+        document.documentElement.dataset.theme = savedTheme === "light" ? "light" : "dark";
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/client/src/main.tsx"></script>
   </body>

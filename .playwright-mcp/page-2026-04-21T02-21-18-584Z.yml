@@ -1,0 +1,198 @@
+- main [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - paragraph [ref=e6]: CSV-backed curriculum tracker
+      - heading "Interview Prep Activity Tracker" [level=1] [ref=e7]
+      - paragraph [ref=e8]: Choose a plan, track the work, and add markdown plans when the curriculum changes.
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - text: Active plan
+        - combobox "Active plan" [ref=e11]
+      - button "Switch to light mode" [pressed] [ref=e12] [cursor=pointer]:
+        - img [ref=e14]
+      - button "Refresh CSV" [ref=e17] [cursor=pointer]
+  - navigation "Primary sections" [ref=e18]:
+    - button "Tracker" [ref=e19] [cursor=pointer]
+    - button "Plans" [ref=e20] [cursor=pointer]
+    - button "Chat" [ref=e21] [cursor=pointer]
+  - region "Tracker summary" [ref=e22]:
+    - generic [ref=e23]:
+      - generic [ref=e24]: Total activities
+      - strong [ref=e25]: "0"
+    - generic [ref=e26]:
+      - generic [ref=e27]: Completed
+      - strong [ref=e28]: "0"
+    - generic [ref=e29]:
+      - generic [ref=e30]: Time spent
+      - strong [ref=e31]: "0"
+      - generic [ref=e32]: minutes
+    - generic [ref=e33]:
+      - generic [ref=e34]: Avg confidence
+      - strong [ref=e35]: "-"
+    - generic [ref=e36]:
+      - generic [ref=e37]: Review again
+      - strong [ref=e38]: "0"
+    - generic [ref=e39]:
+      - generic [ref=e40]: Hint or solution
+      - strong [ref=e41]: "0"
+  - region "Add Activity" [ref=e42]:
+    - generic [ref=e43]:
+      - heading "Add Activity" [level=2] [ref=e44]
+      - paragraph [ref=e45]: One CSV row per activity. Enum values are saved as lower_snake_case.
+    - generic [ref=e46]:
+      - generic [ref=e47]:
+        - text: Date
+        - textbox "Date" [ref=e48]: 2026-04-20
+      - generic [ref=e49]:
+        - text: Category
+        - combobox "Category" [ref=e50]:
+          - option "Arrays Hashing" [selected]
+          - option "Two Pointers"
+          - option "Stack"
+          - option "Sliding Window"
+          - option "Binary Search"
+          - option "Linked List"
+          - option "Trees"
+          - option "Heap"
+          - option "Intervals"
+          - option "Backtracking"
+          - option "Graphs"
+          - option "Dp 1d"
+          - option "System Design"
+          - option "Behavioral"
+          - option "Mock Interview"
+          - option "Review"
+      - generic [ref=e51]:
+        - text: Item type
+        - combobox "Item type" [ref=e52]:
+          - option "Leetcode New" [selected]
+          - option "Leetcode Review"
+          - option "System Design"
+          - option "Behavioral"
+          - option "Mock"
+          - option "Notes Review"
+      - generic [ref=e53]:
+        - text: Item name
+        - textbox "Item name" [ref=e54]:
+          - /placeholder: Group Anagrams
+      - generic [ref=e55]:
+        - text: Difficulty
+        - combobox "Difficulty" [ref=e56]:
+          - option "Not applicable" [selected]
+          - option "Easy"
+          - option "Medium"
+          - option "Hard"
+      - generic [ref=e57]:
+        - text: Status
+        - combobox "Status" [ref=e58]:
+          - option "Not Started" [selected]
+          - option "In Progress"
+          - option "Done"
+          - option "Review Again"
+          - option "Skipped"
+      - generic [ref=e59]:
+        - text: Time spent
+        - spinbutton "Time spent" [ref=e60]
+      - generic [ref=e61]:
+        - text: Confidence
+        - spinbutton "Confidence" [ref=e62]
+      - generic [ref=e63]:
+        - text: Attempt type
+        - combobox "Attempt type" [ref=e64]:
+          - option "Not applicable" [selected]
+          - option "First Try"
+          - option "Re Solve"
+          - option "Timed"
+          - option "Mock"
+      - generic [ref=e65]:
+        - text: Result
+        - combobox "Result" [ref=e66]:
+          - option "Not applicable" [selected]
+          - option "Solved Alone"
+          - option "Solved With Hint"
+          - option "Needed Solution"
+          - option "Partial"
+          - option "Review Only"
+          - option "Explained Only"
+      - generic [ref=e67]:
+        - text: Pattern
+        - textbox "Pattern" [ref=e68]:
+          - /placeholder: sliding_window
+      - generic [ref=e69]:
+        - text: Interview relevance
+        - combobox "Interview relevance" [ref=e70]:
+          - option "High" [selected]
+          - option "Medium"
+          - option "Low"
+      - generic [ref=e71]:
+        - text: Scheduled date
+        - textbox "Scheduled date" [ref=e72]
+      - generic [ref=e73]:
+        - text: Completed at
+        - textbox "Completed at" [ref=e74]
+      - generic [ref=e75]:
+        - text: Source
+        - textbox "Source" [ref=e76]:
+          - /placeholder: neetcode150
+          - text: custom
+      - generic [ref=e77]:
+        - text: Notes
+        - textbox "Notes" [ref=e78]:
+          - /placeholder: Keep notes concise
+      - generic [ref=e79]:
+        - button "Clear" [ref=e80] [cursor=pointer]
+        - button "Append activity" [ref=e81] [cursor=pointer]
+  - region "Tracker filters" [ref=e82]:
+    - generic [ref=e83]:
+      - text: Category
+      - combobox "Category" [ref=e84]:
+        - option "All categories" [selected]
+        - option "Arrays Hashing"
+        - option "Two Pointers"
+        - option "Stack"
+        - option "Sliding Window"
+        - option "Binary Search"
+        - option "Linked List"
+        - option "Trees"
+        - option "Heap"
+        - option "Intervals"
+        - option "Backtracking"
+        - option "Graphs"
+        - option "Dp 1d"
+        - option "System Design"
+        - option "Behavioral"
+        - option "Mock Interview"
+        - option "Review"
+    - generic [ref=e85]:
+      - text: Status
+      - combobox "Status" [ref=e86]:
+        - option "All statuses" [selected]
+        - option "Not Started"
+        - option "In Progress"
+        - option "Done"
+        - option "Review Again"
+        - option "Skipped"
+    - generic [ref=e87]:
+      - text: Type
+      - combobox "Type" [ref=e88]:
+        - option "All types" [selected]
+        - option "Leetcode New"
+        - option "Leetcode Review"
+        - option "System Design"
+        - option "Behavioral"
+        - option "Mock"
+        - option "Notes Review"
+    - generic [ref=e89]:
+      - text: Relevance
+      - combobox "Relevance" [ref=e90]:
+        - option "All relevance" [selected]
+        - option "High"
+        - option "Medium"
+        - option "Low"
+    - generic [ref=e91]:
+      - text: Date
+      - textbox "Date" [ref=e92]
+    - generic [ref=e93]:
+      - text: Search
+      - searchbox "Search" [ref=e94]
+  - paragraph [ref=e95]: Loading tracker rows...

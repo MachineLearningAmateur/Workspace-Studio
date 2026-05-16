@@ -2,7 +2,13 @@ node_modules/
 client/dist/
 server/dist/
 data/
+.tmp/
 *.log
 .env
+.env.*
+!.env.example
+*.local
+client-dev*.log
+server-dev*.log
 launcher/bin/
 launcher/obj/

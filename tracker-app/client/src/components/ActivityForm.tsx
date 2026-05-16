@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import {
   attemptTypes,
   categories,
@@ -185,21 +186,17 @@ export function ActivityForm({
         </label>
 
         <label>
-          Scheduled date
-          <input
-            type="date"
+          Scheduled date/time
+          <DateTimeControls
             value={value.scheduled_date}
-            onChange={(event) => updateField("scheduled_date", event.target.value)}
+            allowDateOnly
+            onChange={(nextValue) => updateField("scheduled_date", nextValue)}
           />
         </label>
 
         <label>
           Completed at
-          <input
-            type="datetime-local"
-            value={value.completed_at}
-            onChange={(event) => updateField("completed_at", event.target.value)}
-          />
+          <DateTimeControls value={value.completed_at} onChange={(nextValue) => updateField("completed_at", nextValue)} />
         </label>
 
         <label>
@@ -242,3 +239,185 @@ export function ActivityForm({
     </section>
   );
 }
+
+function DateTimeControls({
+  value,
+  allowDateOnly = false,
+  onChange
+}: {
+  value: string;
+  allowDateOnly?: boolean;
+  onChange: (value: string) => void;
+}) {
+  const dateInputRef = useRef<HTMLInputElement | null>(null);
+  const timeInputRef = useRef<HTMLInputElement | null>(null);
+  const date = getDatePart(value);
+  const time = getTimePart(value);
+  const [includeTime, setIncludeTime] = useState(Boolean(time) || (!allowDateOnly && Boolean(date)));
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [pickerHour, setPickerHour] = useState("00");
+  const [pickerMinute, setPickerMinute] = useState("00");
+
+  useEffect(() => {
+    setIncludeTime(Boolean(time) || (!allowDateOnly && Boolean(date)));
+  }, [allowDateOnly, date, time]);
+
+  useEffect(() => {
+    setPickerHour(time.slice(0, 2) || "00");
+    setPickerMinute(time.slice(3, 5) || "00");
+  }, [time]);
+
+  function updateDate(nextDate: string) {
+    if (!nextDate) {
+      onChange("");
+      return;
+    }
+
+    const shouldIncludeTime = !allowDateOnly || includeTime;
+    const nextTime = shouldIncludeTime ? time || getCurrentLocalTime() : "";
+    onChange(formatDateTimeValue(nextDate, nextTime, allowDateOnly));
+  }
+
+  function updateTime(nextTime: string) {
+    if (!date) {
+      return;
+    }
+
+    onChange(formatDateTimeValue(date, nextTime, allowDateOnly));
+  }
+
+  function updateIncludeTime(nextIncludeTime: boolean) {
+    setIncludeTime(nextIncludeTime);
+
+    if (!date) {
+      return;
+    }
+
+    onChange(formatDateTimeValue(date, nextIncludeTime ? time : "", allowDateOnly));
+  }
+
+  function openTimePicker() {
+    setPickerHour(time.slice(0, 2) || "00");
+    setPickerMinute(time.slice(3, 5) || "00");
+    setIsTimePickerOpen(true);
+  }
+
+  function applyTimePicker() {
+    updateTime(`${pickerHour}:${pickerMinute}`);
+    setIsTimePickerOpen(false);
+  }
+
+  return (
+    <span className="date-time-controls">
+      <span className="date-time-inline">
+        <input ref={dateInputRef} type="date" value={date} aria-label="Date" onChange={(event) => updateDate(event.target.value)} />
+        <button className="date-time-picker-button" type="button" onClick={() => openNativePicker(dateInputRef.current)}>
+          Pick date
+        </button>
+      </span>
+      {allowDateOnly ? (
+        <label className="date-time-toggle">
+          <input type="checkbox" checked={includeTime} onChange={(event) => updateIncludeTime(event.target.checked)} />
+          Include time
+        </label>
+      ) : null}
+      {!allowDateOnly || includeTime ? (
+        <span className="date-time-inline">
+          <input
+            ref={timeInputRef}
+            type="time"
+            value={time}
+            disabled={!date}
+            aria-label="Time"
+            step="60"
+            onChange={(event) => updateTime(event.target.value)}
+          />
+          <button className="date-time-picker-button" type="button" disabled={!date} onClick={openTimePicker}>
+            Pick time
+          </button>
+        </span>
+      ) : null}
+      {(!allowDateOnly || includeTime) && isTimePickerOpen && date ? (
+        <span className="time-picker-popover" role="dialog" aria-label="Choose time">
+          <span className="time-picker-selects">
+            <label>
+              Hour
+              <select value={pickerHour} onChange={(event) => setPickerHour(event.target.value)}>
+                {hourOptions.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hour}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Minute
+              <select value={pickerMinute} onChange={(event) => setPickerMinute(event.target.value)}>
+                {minuteOptions.map((minute) => (
+                  <option key={minute} value={minute}>
+                    {minute}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </span>
+          <span className="time-picker-actions">
+            <button className="ghost-button" type="button" onClick={() => setIsTimePickerOpen(false)}>
+              Cancel
+            </button>
+            <button type="button" onClick={applyTimePicker}>
+              Set time
+            </button>
+          </span>
+        </span>
+      ) : null}
+      <button className="ghost-button" type="button" onClick={() => onChange("")}>
+        Clear
+      </button>
+    </span>
+  );
+}
+
+function getDatePart(value: string) {
+  return value.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? "";
+}
+
+function getTimePart(value: string) {
+  return value.match(/T(\d{2}:\d{2})/)?.[1] ?? "";
+}
+
+function formatDateTimeValue(date: string, time: string, allowDateOnly: boolean) {
+  if (!date) {
+    return "";
+  }
+
+  if (!time && allowDateOnly) {
+    return date;
+  }
+
+  return `${date}T${time || "00:00"}`;
+}
+
+function getCurrentLocalTime() {
+  const now = new Date();
+  const hour = String(now.getHours()).padStart(2, "0");
+  const minute = String(now.getMinutes()).padStart(2, "0");
+  return `${hour}:${minute}`;
+}
+
+function openNativePicker(input: HTMLInputElement | null) {
+  if (!input || input.disabled) {
+    return;
+  }
+
+  if (typeof input.showPicker === "function") {
+    input.showPicker();
+    return;
+  }
+
+  input.focus();
+  input.click();
+}
+
+const hourOptions = Array.from({ length: 24 }, (_, index) => String(index).padStart(2, "0"));
+const minuteOptions = Array.from({ length: 60 }, (_, index) => String(index).padStart(2, "0"));

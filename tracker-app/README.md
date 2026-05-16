@@ -1,27 +1,11 @@
 # Interview Prep Activity Tracker
 
-A local-first website for tracking interview prep in a normalized CSV file. The CSV is the source of truth and uses one row per study activity.
+A local-first React and Express app for tracking interview-prep work in CSV files. Each curriculum plan has its own CSV, and markdown uploads can create new plan-specific trackers.
 
-## What It Does
-
-- Creates a missing CSV file with the required header.
-- Reads activity rows through an Express API.
-- Appends one new study activity at a time.
-- Validates dates, enum fields, time spent, and confidence before writing.
-- Shows a React dashboard with summaries, filters, search, table view, add form, and row editing.
-
-## Setup
+## Quick Start
 
 ```bash
-cd tracker-app
 npm install
-```
-
-## Run Locally
-
-Start the frontend and backend together:
-
-```bash
 npm run dev
 ```
 
@@ -37,76 +21,122 @@ The API runs on:
 http://127.0.0.1:3001
 ```
 
-## CSV Path
+## Quiet Windows Launcher
 
-By default, the backend uses:
+Double-click:
 
 ```text
-./data/study_activities.csv
+launcher\StartInterviewPrepTracker.vbs
 ```
 
-Override it with `TRACKER_CSV_PATH`:
+This starts `npm run dev` in the background, opens the tracker in your browser, and writes server output to:
 
-```bash
-TRACKER_CSV_PATH=./data/my-activities.csv npm run dev:server
+```text
+launcher\tracker-launcher.log
 ```
 
-PowerShell:
+There is also a C# launcher source if you want a compiled `.exe`. If the .NET SDK is installed, build with:
 
 ```powershell
-$env:TRACKER_CSV_PATH = "./data/my-activities.csv"
+dotnet build .\launcher\InterviewPrepTrackerLauncher.csproj -c Release
+```
+
+Run:
+
+```text
+launcher\bin\Release\net8.0-windows\InterviewPrepTrackerLauncher.exe
+```
+
+On this machine, the .NET Framework compiler is available even though the .NET SDK is not. This command builds a quiet Windows executable:
+
+```powershell
+$csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+New-Item -ItemType Directory -Path .\launcher\bin\Release\net48 -Force
+& $csc /nologo /target:winexe /out:".\launcher\bin\Release\net48\InterviewPrepTrackerLauncher.exe" /reference:System.Windows.Forms.dll /reference:System.dll /reference:System.Drawing.dll ".\launcher\InterviewPrepTrackerLauncher.cs"
+```
+
+Run:
+
+```text
+launcher\bin\Release\net48\InterviewPrepTrackerLauncher.exe
+```
+
+## What It Does
+
+- Keeps tracker data in CSV files, not a database.
+- Starts with an empty plan registry; plans are created explicitly when needed.
+- Lets the main page switch between available plans.
+- Creates and revises plans through Open Chat CSV previews.
+- Creates a separate CSV for every uploaded plan under `./data/plans/<plan-id>/study_activities.csv`.
+- Deletes uploaded plans and their CSV files from the Plans tab.
+- Adds a unified Chat tab for open Codex chat and guided learning sessions.
+- Lets open chat prompt Codex with tracker progress and selected markdown sources.
+- Adds a Profile tab for saved resume/background context that Codex can use for STAR and behavioral guidance.
+- Adds a global Job Apps tab backed by `./data/job-applications.json`.
+- Saves valid Codex CSV previews as new plans, additions to the selected plan, or replacements for the selected plan.
+- Drafts guided Codex lessons from individual tracker tasks.
+- Lets Codex review completed sessions, update the source tracker row, and maintain `./data/knowledge-base.md`.
+- Optionally invokes Codex on the backend to revise the current curriculum into the new plan CSV.
+- Falls back to a starter CSV parsed from markdown when Codex is not configured.
+
+## Codex Revision Command
+
+By default, the backend hands uploaded markdown and the current curriculum to:
+
+```text
+codex exec --skip-git-repo-check --sandbox read-only --ephemeral --json --output-last-message "{outputFile}" -
+```
+
+Set `CODEX_REVISE_COMMAND` when you want to override that command. The command must read the prompt from stdin and write only the revised tracker CSV to stdout.
+If the command uses `{outputFile}`, the backend replaces it with a temporary file path and reads the final Codex message from that file.
+
+PowerShell example:
+
+```powershell
+$env:CODEX_REVISE_COMMAND = 'codex exec --skip-git-repo-check --sandbox read-only --ephemeral --json --output-last-message "{outputFile}" -'
 npm run dev:server
 ```
 
-## CSV Schema
+To disable Codex revision and use markdown fallback rows:
 
-When the file is missing, the backend creates it with this exact header:
-
-```csv
-date,category,item_type,item_name,difficulty,status,time_spent_min,confidence,attempt_type,result,pattern,interview_relevance,scheduled_date,completed_at,source,notes
+```powershell
+$env:CODEX_REVISE_COMMAND = "off"
+npm run dev:server
 ```
 
-Rows are written as standard UTF-8 CSV. Commas, quotes, and line breaks in free-text fields are escaped by the CSV writer.
+If the command fails, the backend stores the prompt at:
 
-## API Examples
-
-Get all rows:
-
-```bash
-curl http://127.0.0.1:3001/api/tracker
+```text
+./data/plans/<plan-id>/codex-revision-prompt.md
 ```
 
-Append one activity:
+and creates a starter CSV so the plan can still be selected and edited.
 
-```bash
-curl -X POST http://127.0.0.1:3001/api/tracker \
-  -H "Content-Type: application/json" \
-  -d "{\"date\":\"2026-04-20\",\"category\":\"sliding_window\",\"item_type\":\"leetcode_new\",\"item_name\":\"Longest Substring Without Repeating Characters\",\"difficulty\":\"medium\",\"status\":\"done\",\"time_spent_min\":\"42\",\"confidence\":\"3\",\"attempt_type\":\"first_try\",\"result\":\"solved_with_hint\",\"pattern\":\"sliding_window\",\"interview_relevance\":\"high\",\"scheduled_date\":\"2026-04-20\",\"completed_at\":\"2026-04-20T20:15\",\"source\":\"neetcode150\",\"notes\":\"Forgot how to shrink the window correctly\"}"
+## Configuration
+
+Default data paths:
+
+```text
+./data/plans.json
+./data/job-applications.json
+./data/study_activities.csv
+./data/plans/<plan-id>/study_activities.csv
 ```
 
-Edit row index `0`:
+Environment variables:
 
-```bash
-curl -X PUT http://127.0.0.1:3001/api/tracker/0 \
-  -H "Content-Type: application/json" \
-  -d "{\"date\":\"2026-04-20\",\"category\":\"sliding_window\",\"item_type\":\"leetcode_new\",\"item_name\":\"Longest Substring Without Repeating Characters\",\"difficulty\":\"medium\",\"status\":\"review_again\",\"time_spent_min\":\"42\",\"confidence\":\"3\",\"attempt_type\":\"first_try\",\"result\":\"solved_with_hint\",\"pattern\":\"sliding_window\",\"interview_relevance\":\"high\",\"scheduled_date\":\"2026-04-20\",\"completed_at\":\"2026-04-20T20:15\",\"source\":\"neetcode150\",\"notes\":\"Need to re-solve without hints\"}"
+```text
+TRACKER_CSV_PATH          Default plan CSV path
+TRACKER_DATA_DIR          Plan registry and uploaded plan directory
+CODEX_REVISE_COMMAND      Optional markdown-to-CSV revision command
+CODEX_REVISE_TIMEOUT_MS   Optional Codex command timeout, default 120000
+CODEX_CHAT_COMMAND        Optional Codex chat command override
+CODEX_CHAT_TIMEOUT_MS     Optional Codex chat timeout, default 120000
+CODEX_SESSION_COMMAND     Optional guided-session command override
+CODEX_SESSION_TIMEOUT_MS  Optional guided-session timeout, default 120000
+CODEX_PROFILE_COMMAND     Optional resume-to-background command override
+CODEX_PROFILE_TIMEOUT_MS  Optional profile generation timeout, default 120000
 ```
-
-Reset to header only:
-
-```bash
-curl -X POST http://127.0.0.1:3001/api/tracker/reset
-```
-
-## Validation
-
-The backend enforces:
-
-- `date` uses `YYYY-MM-DD`
-- `category`, `item_type`, `status`, `interview_relevance`, and other enum fields use approved lower_snake_case values
-- `time_spent_min` is an integer greater than or equal to `0` when provided
-- `confidence` is an integer from `1` to `5` when provided
-- empty strings are preserved for optional fields that do not apply
 
 ## Checks
 
@@ -114,3 +144,12 @@ The backend enforces:
 npm run typecheck
 npm run build
 ```
+
+## More Docs
+
+- [Plan workflow](docs/plan-workflow.md)
+- [Codex chat](docs/codex-chat.md)
+- [Learning sessions](docs/learning-sessions.md)
+- [Enhancements and roadmap](docs/enhancements-roadmap.md)
+- [API reference](docs/api.md)
+- [Product spec](docs/product-spec.md)
