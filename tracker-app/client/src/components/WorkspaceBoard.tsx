@@ -86,11 +86,12 @@ export function WorkspaceBoard({
         </label>
       </div>
 
-      <div className="workspace-board">
+      <div className="workspace-board" role="list" aria-label={`${workspace.name} kanban columns`}>
         {columns.map((column) => (
           <section
             key={column.id}
             className={`workspace-column ${draggedId ? "workspace-column-ready" : ""}`}
+            role="listitem"
             onDragOver={(event) => event.preventDefault()}
             onDrop={(event) => {
               event.preventDefault();

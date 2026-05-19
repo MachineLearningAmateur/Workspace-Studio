@@ -2555,14 +2555,24 @@ html[data-theme="dark"] .modal {
 
 .workspace-board {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(280px, 320px);
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
+  overflow-x: auto;
+  overflow-y: hidden;
+  min-height: min(560px, calc(100vh - 280px));
+  height: min(720px, calc(100vh - 240px));
+  padding-bottom: 8px;
+  scrollbar-gutter: stable both-edges;
 }
 
 .workspace-column {
-  min-height: 380px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
   padding: 14px;
+  overflow: hidden;
 }
 
 .workspace-column-ready {
@@ -2574,6 +2584,8 @@ html[data-theme="dark"] .modal {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #d9ded5;
 }
 
 .workspace-column-header span {
@@ -2587,6 +2599,10 @@ html[data-theme="dark"] .modal {
 .workspace-card-stack {
   display: grid;
   gap: 10px;
+  align-content: start;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .workspace-column-empty {
@@ -2596,17 +2612,22 @@ html[data-theme="dark"] .modal {
 
 .workspace-card {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid #d7ddd4;
   border-radius: 14px;
   background: linear-gradient(180deg, #ffffff, #f4f7f2);
-  padding: 14px;
+  padding: 12px;
   cursor: pointer;
 }
 
 .workspace-card h3 {
   margin: 0;
-  font-size: 1rem;
+  font-size: 0.98rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .workspace-card p {
@@ -2632,6 +2653,11 @@ html[data-theme="dark"] .modal {
   color: #6f817b;
 }
 
+.workspace-card-notes p {
+  max-height: 140px;
+  overflow: auto;
+}
+
 .workspace-card-topline {
   display: flex;
   align-items: center;
@@ -2647,6 +2673,12 @@ html[data-theme="dark"] .modal {
   border-radius: 999px;
   background: #ecf5ef;
   color: #155f4d;
+}
+
+.workspace-card-source {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workspace-card-tags {
@@ -3034,7 +3066,10 @@ html[data-theme="dark"] .workspace-subject-list span {
   }
 
   .workspace-board {
-    grid-template-columns: 1fr;
+    grid-auto-columns: minmax(250px, 88vw);
+    min-height: 0;
+    height: auto;
+    max-height: none;
   }
 }
 
